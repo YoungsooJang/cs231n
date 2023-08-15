@@ -67,6 +67,7 @@ class TwoLayerNet(object):
     # Unpack variables from the params dictionary
     W1, b1 = self.params['W1'], self.params['b1']
     W2, b2 = self.params['W2'], self.params['b2']
+    # print(W1.shape, b1.shape, W2.shape, b2.shape, X.shape)
     N, D = X.shape
 
     # Compute the forward pass
@@ -76,7 +77,10 @@ class TwoLayerNet(object):
     # Store the result in the scores variable, which should be an array of      #
     # shape (N, C).                                                             #
     #############################################################################
-    pass
+    O1 = X @ W1 + b1
+    H1 = np.maximum(0, O1)
+    O2 = H1 @ W2 + b2
+    scores = O2
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -93,7 +97,12 @@ class TwoLayerNet(object):
     # in the variable loss, which should be a scalar. Use the Softmax           #
     # classifier loss.                                                          #
     #############################################################################
-    pass
+    exp_scores = np.exp(scores)
+    exp_scores_sum = np.sum(exp_scores, axis=1)
+    softmax_values = exp_scores / exp_scores_sum.reshape(-1, 1)
+    loss = np.sum(-np.log(softmax_values[range(N), y]))
+    loss /= N
+    loss += reg * (np.sum(W1 ** 2) + np.sum(W2 ** 2) + np.sum(b1 ** 2) + np.sum(b2 ** 2))
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -105,7 +114,31 @@ class TwoLayerNet(object):
     # and biases. Store the results in the grads dictionary. For example,       #
     # grads['W1'] should store the gradient on W1, and be a matrix of same size #
     #############################################################################
-    pass
+    dO2 = softmax_values
+    dO2[range(N), y] = -1 + softmax_values[range(N), y]
+    # print('dO2', dO2.shape)
+    grads['b2'] = np.sum(dO2, axis=0)
+    # print('b2', grads['b2'].shape)
+    dM2 = dO2
+    grads['W2'] = H1.T @ dM2
+    # print('W2', grads['W2'].shape)
+    dH1 = dM2 @ W2.T
+    dO1 = dH1 * (O1 > 0)
+    # print('dO1', dO1.shape)
+    grads['b1'] = np.sum(dO1, axis=0)
+    # print('b1', grads['b1'].shape)
+    dM1 = dO1
+    grads['W1'] = X.T @ dM1
+    # print('W1', grads['W1'].shape)
+
+    grads['W1'] /= N
+    grads['b1'] /= N
+    grads['W2'] /= N
+    grads['b2'] /= N
+    grads['W1'] += 2 * reg * W1
+    grads['b1'] += 2 * reg * b1
+    grads['W2'] += 2 * reg * W2
+    grads['b2'] += 2 * reg * b2
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -134,7 +167,7 @@ class TwoLayerNet(object):
     - verbose: boolean; if true print progress during optimization.
     """
     num_train = X.shape[0]
-    iterations_per_epoch = max(num_train / batch_size, 1)
+    iterations_per_epoch = max(int(num_train / batch_size), 1)
 
     # Use SGD to optimize the parameters in self.model
     loss_history = []
@@ -149,7 +182,9 @@ class TwoLayerNet(object):
       # TODO: Create a random minibatch of training data and labels, storing  #
       # them in X_batch and y_batch respectively.                             #
       #########################################################################
-      pass
+      batch_mask = np.random.choice(np.arange(num_train), batch_size)
+      X_batch = X[batch_mask, :]
+      y_batch = y[batch_mask]
       #########################################################################
       #                             END OF YOUR CODE                          #
       #########################################################################
@@ -164,7 +199,10 @@ class TwoLayerNet(object):
       # using stochastic gradient descent. You'll need to use the gradients   #
       # stored in the grads dictionary defined above.                         #
       #########################################################################
-      pass
+      self.params['W1'] -= learning_rate * grads['W1']
+      self.params['W2'] -= learning_rate * grads['W2']
+      self.params['b2'] -= learning_rate * grads['b2']
+      self.params['b1'] -= learning_rate * grads['b1']
       #########################################################################
       #                             END OF YOUR CODE                          #
       #########################################################################
@@ -209,11 +247,97 @@ class TwoLayerNet(object):
     ###########################################################################
     # TODO: Implement this function; it should be VERY simple!                #
     ###########################################################################
-    pass
+    W1, b1 = self.params['W1'], self.params['b1']
+    W2, b2 = self.params['W2'], self.params['b2']
+    O1 = X @ W1 + b1
+    H1 = np.maximum(0, O1)
+    O2 = H1 @ W2 + b2
+    scores = O2
+    y_pred = np.argmax(scores, axis=1)
     ###########################################################################
     #                              END OF YOUR CODE                           #
     ###########################################################################
 
     return y_pred
+  
+def tune_parameters(X_train, y_train, X_val, y_val):
+  best_net = None # store the best model into this
+  best_val = -1
+
+  input_size = 32 * 32 * 3
+  num_classes = 10
+
+  hidden_size_set = [70]
+  num_iters_set = [2500]
+  batch_size_set = [256]
+  learning_rate_set = [1e-3]
+  learning_rate_decay_set = [0.95]
+  reg_set = [0.3]
+
+  # 50 3000 256 0.001 0.99 0.25  Validation accuracy:  0.494
+  # 50 2000 256 0.001 0.95 0.25  Validation accuracy:  0.511
+
+  # try #1
+  # hidden_size_set = [25, 50, 100, 200]
+  # num_iters_set = [1000]
+  # batch_size_set = [32, 64, 200]
+  # learning_rate_set = [1e-4, 5e-3, 1e-3]
+  # learning_rate_decay_set = [0.9, 0.95, 0.99]
+  # reg_set = [0.25, 2.5, 2.5e1]
+  # 50 1000 200 0.001 0.9 0.25  Validation accuracy:  0.473
+  # 50 1000 200 0.001 0.99 0.25  Validation accuracy:  0.479
+
+  # try #2
+  # hidden_size_set = [25, 50, 75]
+  # num_iters_set = [1000, 2000]
+  # batch_size_set = [256]
+  # learning_rate_set = [1e-3, 2.5e-3, 5e-3]
+  # learning_rate_decay_set = [0.99]
+  # reg_set = [0.25]
+  # 50 2000 256 0.001 0.99 0.25  Validation accuracy:  0.496
+
+  # 50 3000 256 0.001 0.99 0.25  Validation accuracy:  0.494
+
+  for hidden_size in hidden_size_set:
+      for num_iters in num_iters_set:
+          for batch_size in batch_size_set:
+              for learning_rate in learning_rate_set:
+                  for learning_rate_decay in learning_rate_decay_set:
+                      for reg in reg_set:
+                        print(hidden_size, num_iters, batch_size, learning_rate, learning_rate_decay, reg)
+                        net = TwoLayerNet(input_size, hidden_size, num_classes)
+                        
+                        # Train the network
+                        stats = net.train(X_train, y_train, X_val, y_val,
+                                    num_iters=num_iters, batch_size=batch_size,
+                                    learning_rate=learning_rate, learning_rate_decay=learning_rate_decay,
+                                    reg=reg, verbose=False)
+                        
+                        # Plot the loss function and train / validation accuracies
+                        print(stats['val_acc_history'])
+                        plt.subplot(2, 1, 1)
+                        plt.plot(stats['loss_history'])
+                        plt.title('Loss history')
+                        plt.xlabel('Iteration')
+                        plt.ylabel('Loss')
+
+                        plt.subplot(2, 1, 2)
+                        plt.plot(stats['train_acc_history'], label='train')
+                        plt.plot(stats['val_acc_history'], label='val')
+                        plt.legend()
+                        plt.title('Classification accuracy history')
+                        plt.xlabel('Epoch')
+                        plt.ylabel('Clasification accuracy')
+                        plt.show()
+                        
+                        # Predict on the validation set
+                        val_acc = (net.predict(X_val) == y_val).mean()
+                        print('\t\t\t\t\tValidation accuracy: ', val_acc)
+                        if val_acc > best_val:
+                            best_val = val_acc
+                            best_net = net
+
+  return best_net
+                        
 
 
