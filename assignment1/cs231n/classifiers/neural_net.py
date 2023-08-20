@@ -264,7 +264,7 @@ def tune_parameters(X_train, y_train, X_val, y_val):
   best_net = None # store the best model into this
   best_val = -1
 
-  input_size = 32 * 32 * 3
+  input_size = X_train.shape[1]
   num_classes = 10
 
   hidden_size_set = [70]
@@ -307,37 +307,42 @@ def tune_parameters(X_train, y_train, X_val, y_val):
                         print(hidden_size, num_iters, batch_size, learning_rate, learning_rate_decay, reg)
                         net = TwoLayerNet(input_size, hidden_size, num_classes)
                         
-                        # Train the network
-                        stats = net.train(X_train, y_train, X_val, y_val,
-                                    num_iters=num_iters, batch_size=batch_size,
-                                    learning_rate=learning_rate, learning_rate_decay=learning_rate_decay,
-                                    reg=reg, verbose=False)
+                        val_acc = train_during_tuning(
+                          net, X_train, y_train, X_val, y_val, num_iters, batch_size, learning_rate, learning_rate_decay, reg
+                        )
                         
-                        # Plot the loss function and train / validation accuracies
-                        print(stats['val_acc_history'])
-                        plt.subplot(2, 1, 1)
-                        plt.plot(stats['loss_history'])
-                        plt.title('Loss history')
-                        plt.xlabel('Iteration')
-                        plt.ylabel('Loss')
-
-                        plt.subplot(2, 1, 2)
-                        plt.plot(stats['train_acc_history'], label='train')
-                        plt.plot(stats['val_acc_history'], label='val')
-                        plt.legend()
-                        plt.title('Classification accuracy history')
-                        plt.xlabel('Epoch')
-                        plt.ylabel('Clasification accuracy')
-                        plt.show()
-                        
-                        # Predict on the validation set
-                        val_acc = (net.predict(X_val) == y_val).mean()
                         print('\t\t\t\t\tValidation accuracy: ', val_acc)
                         if val_acc > best_val:
                             best_val = val_acc
                             best_net = net
 
   return best_net
-                        
 
+def train_during_tuning(net, X_train, y_train, X_val, y_val, num_iters, batch_size, learning_rate, learning_rate_decay, reg):
+  # Train the network
+  stats = net.train(X_train, y_train, X_val, y_val,
+              num_iters=num_iters, batch_size=batch_size,
+              learning_rate=learning_rate, learning_rate_decay=learning_rate_decay,
+              reg=reg, verbose=False)
+  
+  # Plot the loss function and train / validation accuracies
+  print(stats['val_acc_history'])
+  plt.subplot(2, 1, 1)
+  plt.plot(stats['loss_history'])
+  plt.title('Loss history')
+  plt.xlabel('Iteration')
+  plt.ylabel('Loss')
 
+  plt.subplot(2, 1, 2)
+  plt.plot(stats['train_acc_history'], label='train')
+  plt.plot(stats['val_acc_history'], label='val')
+  plt.legend()
+  plt.title('Classification accuracy history')
+  plt.xlabel('Epoch')
+  plt.ylabel('Clasification accuracy')
+  plt.show()
+  
+  # Predict on the validation set
+  val_acc = (net.predict(X_val) == y_val).mean()
+  return val_acc
+   
